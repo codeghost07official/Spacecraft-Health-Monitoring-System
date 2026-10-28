@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge %}
+{% block title %}{{ rec.filename }} · Result{% endblock %}
+{% block body_attrs %}data-analysis-id="{{ rec.id }}"{% endblock %}
+{% block content %}
+{% set headline = {
+  "HEALTHY": "All systems look normal",
+  "WARNING": "Unusual behaviour detected",
+  "DANGER": "The spacecraft may be in danger"} %}
+{% set ring_col = {"HEALTHY": "var(--good)", "WARNING": "var(--warn)", "DANGER": "var(--bad)"} %}
+{% set ev_sensor = (a.sensors | selectattr("evaluation") | list | first) %}
+{% set primary = a.sensors[0] %}
+{% set v = a.model_validation %}
+
+<nav class="row no-print" aria-label="Breadcrumb" style="margin-bottom:18px">
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('history') }}">&larr; History</a>
+</nav>
+
+<!-- 1. Verdict -->
+<section class="verdict {{ a.status }}" aria-labelledby="verdict-title">
+  <div class="ring" style="--val: {{ a.health_score }}; --col: {{ ring_col[a.status] }}" role="img"
+       aria-label="Health score {{ a.health_score|round|int }} out of 100">
+    <div class="ring-inner"><div><b>{{ a.health_score|round|int }}</b><span>Health</span></div></div>
+  </div>
+  <div>
+    {{ status_badge(a.status) }}
+    <h1 id="verdict-title">{{ headline[a.status] }}</h1>
+    <p>{{ rec.filename }} · {{ a.file_type }} file · analysed {{ rec.created_at|when }}{% if a.chan_id %} · NASA channel <strong>{{ a.chan_id }}</strong>{% if a.nasa_part == "train" %} (normal recording){% endif %}{% endif %}</p>
+    <div class="row no-print">
+      <button class="btn btn-secondary btn-sm" type="button" data-speak="#report-text">{{ icon("volume") }} <span>Read report aloud</span></button>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('download_csv', analysis_id=rec.id) }}">{{ icon("download") }} Converted CSV</a>
+      <button class="btn btn-secondary btn-sm" type="button" data-print>{{ icon("printer") }} Print / Save PDF</button>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('analyze') }}">{{ icon("upload") }} New analysis</a>
+    </div>
+  </div>
+</section>
+
+<div class="grid grid-4" style="margin-top:18px">
+  <div class="stat"><div class="label">Readings</div><div class="value">{{ "{:,}".format(a.num_readings) }}</div><div class="hint">{% if a.truncated %}latest 200,000 analysed{% else %}all analysed{% endif %}</div></div>
+  <div class="stat"><div class="label">Sensors checked</div><div class="value">{{ a.num_sensors }}</div><div class="hint">{{ a.num_columns }} column(s) in the file</div></div>
+  <div class="stat"><div class="label">Anomaly events</div><div class="value">{{ a.total_events }}</div><div class="hint">periods of unusual behaviour</div></div>
+  <div class="stat"><div class="label">Readings flagged</div><div class="value">{{ (a.sensors | map(attribute="anomalous_readings") | sum) }}</div><div class="hint">across all sensors</div></div>
+</div>
+
+<!-- 2. Charts -->
+<section class="stack" style="margin-top:40px" aria-labelledby="charts-title">
+  <div class="card-head" style="margin:0">
+    <div>
+      <span class="eyebrow">The analysis</span>
+      <h2 id="charts-title" style="margin-top:8px">What AERIS saw</h2>
+    </div>
+  </div>
+  {% for c in charts %}
+  <div class="card chart-card {% if c.small %}chart-small{% endif %}">
+    <figure>
+      <h3 style="font-size:1rem">{{ c.title }}</h3>
+      <img src="data:image/png;base64,{{ c.img }}" alt="{{ c.title }}. {{ c.caption }}" loading="lazy">
+      <figcaption>{{ c.caption }}</figcaption>
+    </figure>
+  </div>
+  {% endfor %}
+
+  <div class="card">
+    <h3>Sensor by sensor</h3>
+    <div class="table-wrap" style="margin-top:12px">
+      <table>
+        <caption class="sr-only">Results for each sensor</caption>
+        <thead><tr><th scope="col">Sensor</th><th scope="col">Status</th><th scope="col">Health</th><th scope="col">Events</th><th scope="col">Flagged</th><th scope="col">Peak risk</th><th scope="col">Forecast RMSE</th></tr></thead>
+        <tbody>
+          {% for s in a.sensors %}
+          <tr>
+            <th scope="row" style="background:none;text-transform:none;letter-spacing:0;font-size:.92rem;color:var(--text)">{{ s.name }}</th>
+            <td>{{ status_badge(s.status) }}</td>
+            <td class="num">{{ s.health_score|round|int }}/100</td>
+            <td class="num">{{ s.num_events }}</td>
+            <td class="num">{{ s.anomaly_ratio|pct }}</td>
+            <td class="num">{{ "%.2f"|format(s.peak_probability) }}</td>
+            <td class="num">{{ "%.4f"|format(s.forecast_metrics.rmse) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Report -->
+<section class="card" style="margin-top:40px" aria-labelledby="report-title" id="report-card"
+         data-report-state="{{ rec.report_source }}" data-report-url="{{ url_for('gemini_report', analysis_id=rec.id) }}">
+  <div class="card-head">
+    <div>
+      <span class="eyebrow">Plain-language report</span>
+      <h2 id="report-title" style="margin-top:8px">What this means</h2>
+    </div>
+    <span class="source-tag" id="report-source">{{ icon("sparkles") }}<span>{% if rec.report_source == "gemini" %}Written by Gemini from the analysis above{% elif rec.report_source == "pending" %}Gemini is writing...{% else %}Built-in report{% endif %}</span></span>
+  </div>
+
+  <div class="report-loading" id="report-loading" role="status" aria-live="polite" {% if rec.report_source != "pending" %}hidden{% endif %}>
+    <span class="spinner" aria-hidden="true"></span>
+    <div>
+      <strong>Gemini is writing your report...</strong>
+      <p class="small muted" style="margin:2px 0 0">This usually takes 5 to 20 seconds. The charts and evaluation metrics on this page are already ready.</p>
+    </div>
+  </div>
+
+  <div class="report-notice" id="report-notice" role="alert" {% if rec.report_source != "built-in" or not gemini_ready %}hidden{% endif %}>
+    {{ icon("alert") }}
+    <div style="flex:1">
+      <strong id="report-notice-title">Gemini didn't respond this time.</strong>
+      <p class="small" style="margin:2px 0 0" id="report-notice-text">Below is a short report written by the platform itself. Your analysis and metrics are complete.</p>
+    </div>
+    <button class="btn btn-secondary btn-sm" type="button" id="report-retry">{{ icon("sparkles") }} Try Gemini again</button>
+  </div>
+
+  <div class="prose" id="report-text" {% if rec.report_source == "pending" %}hidden{% endif %}>{{ rec.report|markdown }}</div>
+</section>
+
+<!-- 4. Evaluation metrics -->
+<section class="card" style="margin-top:22px" aria-labelledby="metrics-title">
+  <div class="card-head">
+    <div>
+      <span class="eyebrow">Evaluation metrics</span>
+      <h2 id="metrics-title" style="margin-top:8px">How accurate is this prediction?</h2>
+    </div>
+    <span class="pill">AERIS v{{ a.model.version }}</span>
+  </div>
+
+  {% set expert = ev_sensor and ev_sensor.get("mode") == "expert" %}
+  {% set evs = ev_sensor.evaluation if ev_sensor else v %}
+  <div class="trust">
+    {% if ev_sensor %}
+    <span>{{ icon("check") }}Checked against NASA expert labels for {{ ev_sensor.chan_id or a.chan_id }}</span>
+    {% if not evs.seen_in_training %}<span>{{ icon("check") }}Judged by a model that never saw this sensor's answers</span>{% endif %}
+    {% if expert %}<span>{{ icon("check") }}Sensor's own neural-network mini brain</span>{% endif %}
+    {% else %}
+    {% if primary.get("mode") == "expert" %}
+    <span>{{ icon("check") }}Recognised as NASA channel {{ a.chan_id }}</span>
+    <span>{{ icon("check") }}Sensor's own neural-network mini brain</span>
+    <span>{{ icon("check") }}Validated fairly on {{ v.get("channels", 17) }} NASA sensors</span>
+    {% else %}
+    <span>{{ icon("check") }}Validated on {{ v.get("channels", 17) }} NASA sensors AERIS had never seen</span>
+    {% endif %}
+    <span>{{ icon("check") }}Forecast errors measured on this file</span>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-2" style="margin-top:18px">
+    {% for label, hit, total, hint in [
+        ("Anomaly events caught", evs.events_detected, evs.events_total, "real anomaly events AERIS found" if ev_sensor else "real anomaly events found during testing"),
+        ("Alarms that were real", evs.alarms_correct, evs.alarms_total, "AERIS alarms that matched a real event" if ev_sensor else "alarms that matched a real event during testing")] %}
+    <div class="metric metric-hero">
+      <div class="top"><span class="name">{{ label }}</span><span class="num">{{ hit }}<small> / {{ total }}</small></span></div>
+      {% set share = (hit / total) if total else 0 %}
+      <div class="bar" role="img" aria-label="{{ label }}: {{ hit }} of {{ total }}"><i style="width: {{ (share * 100)|round(1) }}%"></i></div>
+      <p>{{ hint }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% set src = ev_sensor.evaluation if ev_sensor else v %}
+  <h3 style="margin-top:26px">Anomaly classification</h3>
+  <div class="grid grid-4" style="margin-top:12px">
+    {% for name, val, desc in [
+        ("Precision", src.precision, "Alarms that were correct."),
+        ("Recall", src.recall, "Anomalous readings that were found."),
+        ("F1 score", src.f1, "Balance of precision and recall."),
+        ("Accuracy", src.accuracy, "Readings labelled correctly.")] %}
+    <div class="metric">
+      <div class="top"><span class="name">{{ name }}</span><span class="num">{{ "%.3f"|format(val) }}</span></div>
+      <div class="bar" role="img" aria-label="{{ name }} {{ '%.0f'|format(val * 100) }} percent"><i style="width: {{ (val * 100)|round(1) }}%"></i></div>
+      <p>{{ desc }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% set fm = primary.forecast_metrics %}
+  <h3 style="margin-top:26px">Forecaster on this file{% if a.num_sensors > 1 %} · {{ primary.name }}{% endif %}</h3>
+  <div class="grid grid-4" style="margin-top:12px">
+    <div class="metric"><div class="top"><span class="name">MSE</span><span class="num">{{ "%.5f"|format(fm.mse) }}</span></div><p style="margin-top:10px">Average squared prediction gap.</p></div>
+    <div class="metric"><div class="top"><span class="name">RMSE</span><span class="num">{{ "%.4f"|format(fm.rmse) }}</span></div><p style="margin-top:10px">Typical prediction gap.</p></div>
+    <div class="metric"><div class="top"><span class="name">MAE</span><span class="num">{{ "%.4f"|format(fm.mae) }}</span></div><p style="margin-top:10px">Average prediction gap.</p></div>
+    <div class="metric"><div class="top"><span class="name">MAPE</span><span class="num">{{ "%.2f"|format(fm.mape) }}%</span></div><p style="margin-top:10px">Gap as a percentage.</p></div>
+  </div>
+</section>
+
+<!-- 5. Summary -->
+<section class="summary-card" style="margin-top:22px" aria-labelledby="summary-title">
+  <span class="eyebrow">In short</span>
+  <h2 id="summary-title" class="sr-only">Summary</h2>
+  <p id="summary-text">{{ rec.short_summary }}</p>
+  <div class="row no-print" style="margin-top:18px">
+    <button class="btn btn-secondary btn-sm" type="button" data-chat-ask="Explain this analysis to me in simple words.">{{ icon("chat") }} Ask the assistant about this</button>
+  </div>
+</section>
+{% endblock %}

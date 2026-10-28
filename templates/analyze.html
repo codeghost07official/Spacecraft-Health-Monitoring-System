@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge %}
+{% block title %}Analyze{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <span class="eyebrow">New analysis</span>
+    <h1 style="margin-top:10px">Check a spacecraft's health</h1>
+    <p class="muted">Add a telemetry file and press <strong>Analyze</strong>. That's it.</p>
+  </div>
+</div>
+
+{% if model_error %}
+<div class="flash flash-error" role="alert" style="margin-bottom:24px">{{ icon("alert") }}<span>{{ model_error }}</span></div>
+{% endif %}
+
+<div class="grid" style="grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items:start" id="analyze-layout">
+  <form class="card" method="post" enctype="multipart/form-data" id="analyze-form">
+    <label class="dropzone" id="dropzone" for="file-input">
+      <input type="file" id="file-input" name="file" accept=".npy,.csv,.txt,.tsv,.xlsx,.xls,.json"
+             aria-describedby="dz-help">
+      <span class="dz-icon">{{ icon("upload") }}</span>
+      <span class="dz-title">Drop your telemetry file here</span>
+      <span class="muted" id="dz-help">or click to browse your computer (up to 50 MB)</span>
+      <span class="formats" aria-hidden="true">
+        <span class="pill">.npy</span><span class="pill">.csv</span><span class="pill">.xlsx</span>
+        <span class="pill">.xls</span><span class="pill">.json</span><span class="pill">.txt</span>
+      </span>
+    </label>
+
+    <div class="file-chip" id="file-chip" aria-live="polite">
+      <span class="ficon" id="file-ext">CSV</span>
+      <div style="flex:1; min-width:0">
+        <div class="fname" id="file-name"></div>
+        <div class="small muted" id="file-size"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="button" id="file-clear">{{ icon("close") }} Remove</button>
+    </div>
+
+    {% if samples %}
+    <div class="or">or try real NASA data</div>
+    <div class="field" style="margin-bottom:0">
+      <label for="sample">Pick a NASA test file</label>
+      <select class="select" id="sample" name="sample">
+        <option value="">Choose a sample channel...</option>
+        {% set groups = {} %}
+        {% for s in samples %}
+          {% set _ = groups.setdefault(s.split('-')[0], []).append(s) %}
+        {% endfor %}
+        {% for prefix, items in groups.items() %}
+        <optgroup label="Channel group {{ prefix }}">
+          {% for s in items %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <hr class="divider">
+    <button class="btn btn-primary btn-lg btn-block" type="submit" id="analyze-btn" disabled>
+      {{ icon("sparkles") }} Analyze
+    </button>
+    <p class="small muted" id="analyze-hint" style="text-align:center; margin:12px 0 0">Choose a file or a sample to begin.</p>
+  </form>
+
+  <aside class="stack">
+    <div class="card">
+      <h3>Recent analyses</h3>
+      {% if recent %}
+      <div style="display:grid; gap:4px; margin-top:10px">
+        {% for r in recent %}
+        <a class="recent-item" href="{{ url_for('result', analysis_id=r.id) }}">
+          <span class="h-score {{ r.status }}" style="width:40px;height:40px;font-size:.85rem;border-radius:10px">{{ r.health_score|round|int }}</span>
+          <span class="meta"><strong>{{ r.filename }}</strong><span>{{ r.created_at|when }}</span></span>
+          {{ icon("arrow") }}
+        </a>
+        {% endfor %}
+      </div>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('history') }}" style="margin-top:10px">See all history {{ icon("arrow") }}</a>
+      {% else %}
+      <p class="muted small" style="margin:8px 0 0">Your analyses will appear here.</p>
+      {% endif %}
+    </div>
+    <div class="card">
+      <h3>System status</h3>
+      <div class="status-list" style="margin-top:12px">
+        <div><span class="dot {{ 'dot-on' if model_ready else 'dot-off' }}"></span>AERIS model {{ "ready" if model_ready else "not trained" }}</div>
+        <div><span class="dot {{ 'dot-on' if db_kind == 'neon' else 'dot-off' }}"></span>{{ db_label }}</div>
+        <div><span class="dot {{ 'dot-on' if gemini_ready else 'dot-off' }}"></span>Gemini reports {{ "on" if gemini_ready else "off (built-in report used)" }}</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="overlay" id="overlay" hidden role="alertdialog" aria-modal="true" aria-labelledby="loader-title" aria-describedby="loader-steps">
+  <div class="card loader-card">
+    <div class="radar" aria-hidden="true"></div>
+    <h2 id="loader-title" style="font-size:1.3rem">Analysing telemetry...</h2>
+    <p class="muted small" style="margin:0">This takes a few seconds. Please keep this page open.</p>
+    <ul class="steps" id="loader-steps" aria-live="polite">
+      <li>Converting the file to CSV</li>
+      <li>Finding the sensor readings</li>
+      <li>AERIS is checking every reading</li>
+      <li>Drawing the charts</li>
+    </ul>
+  </div>
+</div>
+<style>@media (max-width: 960px){ #analyze-layout{ grid-template-columns: 1fr !important; } }</style>
+{% endblock %}

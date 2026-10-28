@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge %}
+{% block title %}About{% endblock %}
+{% block content %}
+
+<section class="hero" aria-labelledby="hero-title">
+  <div>
+    <span class="eyebrow">Spacecraft Health Monitoring System</span>
+    <h1 id="hero-title" style="margin-top:14px">Know if your spacecraft is <span>healthy</span> in seconds.</h1>
+    <p class="lead">Spacecraft send millions of sensor readings back to Earth. SHMS uses an AI model called
+      <strong>AERIS</strong> to read all of them and tell you, in plain words, if anything looks wrong.</p>
+    <div class="row">
+      {% if current_user %}
+      <a class="btn btn-primary btn-lg" href="{{ url_for('analyze') }}">Start an analysis {{ icon("arrow") }}</a>
+      <a class="btn btn-secondary btn-lg" href="{{ url_for('history') }}">View history</a>
+      {% else %}
+      <a class="btn btn-primary btn-lg" href="{{ url_for('login') }}">Log in to start {{ icon("arrow") }}</a>
+      <a class="btn btn-secondary btn-lg" href="#how">How it works</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="hero-visual" aria-hidden="true">
+    <div class="orbit"></div>
+    <div class="orbit o2"></div>
+    <div class="planet"></div>
+    <div class="readout">
+      <span class="badge badge-HEALTHY">{{ icon("check-circle") }}Healthy</span>
+      <svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none">
+        <polyline fill="none" stroke="#a78bfa" stroke-width="2" points="0,20 15,18 30,21 45,17 60,19 75,16 90,20 105,18 120,6 128,28 136,19 150,18 165,20 180,17 200,19"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="telemetry" aria-labelledby="t-title">
+  <div class="grid grid-2" style="align-items:center; gap:40px">
+    <div>
+      <span class="eyebrow">The problem</span>
+      <h2 id="t-title" style="margin-top:10px">What is telemetry?</h2>
+      <p>Telemetry is the stream of measurements a spacecraft sends home: temperatures, pressures, battery
+        voltages, wheel speeds and many more. Think of it as the spacecraft's <strong>heartbeat and
+        temperature chart</strong>, sent every few seconds.</p>
+      <p>There is so much of it that people cannot check every number quickly. A small problem hiding in the
+        data can grow into a mission-ending failure. SHMS lets AI do the reading, so engineers can focus on fixing.</p>
+    </div>
+    <div class="grid grid-2">
+      <div class="stat"><div class="label">Sensors studied</div><div class="value">82</div><div class="hint">NASA SMAP &amp; MSL channels</div></div>
+      <div class="stat"><div class="label">Expert-labelled anomalies</div><div class="value">105</div><div class="hint">marked by NASA engineers</div></div>
+      <div class="stat"><div class="label">Readings learned from</div><div class="value">700K+</div><div class="hint">real spacecraft telemetry</div></div>
+      <div class="stat"><div class="label">Time per analysis</div><div class="value">&lt;20s</div><div class="hint">including the AI report</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how" aria-labelledby="how-title">
+  <div class="section-head">
+    <span class="eyebrow">How it works</span>
+    <h2 id="how-title" style="margin-top:10px">Three simple steps</h2>
+    <p>No settings, no model to choose. Just your file and one button.</p>
+  </div>
+  <div class="grid grid-3">
+    <div class="card feature">
+      <div class="icon">{{ icon("upload") }}</div>
+      <span class="step-num">STEP 01</span>
+      <h3>Upload your file</h3>
+      <p>Drop a telemetry file (.npy, .csv, Excel, .json or .txt). SHMS converts it to a CSV table behind the scenes.</p>
+    </div>
+    <div class="card feature">
+      <div class="icon">{{ icon("cpu") }}</div>
+      <span class="step-num">STEP 02</span>
+      <h3>Press Analyze</h3>
+      <p>AERIS checks every reading of every sensor and marks the moments where the spacecraft behaves unusually.</p>
+    </div>
+    <div class="card feature">
+      <div class="icon">{{ icon("sparkles") }}</div>
+      <span class="step-num">STEP 03</span>
+      <h3>Read the results</h3>
+      <p>See easy charts, a report written by Gemini in plain language, accuracy scores and a short summary. Everything is saved in History.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="aeris" aria-labelledby="aeris-title">
+  <div class="section-head">
+    <span class="eyebrow">The AI model</span>
+    <h2 id="aeris-title" style="margin-top:10px">Meet AERIS</h2>
+    <p><strong>A</strong>erospace <strong>E</strong>quipment &amp; <strong>R</strong>eliability <strong>I</strong>ntelligence
+      <strong>S</strong>ystem. It learned from real NASA spacecraft data and works in three stages.</p>
+  </div>
+  <div class="grid grid-3">
+    <div class="card feature">
+      <div class="icon">{{ icon("activity") }}</div>
+      <h3>Stage 1 · The Forecaster</h3>
+      <p>A <strong>Linear Regression</strong> model looks at the last 30 readings and predicts the next one.
+        When the real reading is far from the prediction, that is a "surprise", an early sign of trouble.
+        We measure it with <strong>MSE, RMSE, MAE and MAPE</strong>.</p>
+    </div>
+    <div class="card feature">
+      <div class="icon">{{ icon("target") }}</div>
+      <h3>Stage 2 · The Anomaly Detective</h3>
+      <p>A <strong>Random Forest</strong> classifier studies 27 clues about each reading (its surprise, how rare
+        it is, how it compares to the sensor's normal behaviour) and decides: normal or anomaly. It was picked
+        after comparing it with Logistic Regression and a Decision Tree using <strong>5-fold cross validation</strong>.</p>
+    </div>
+    <div class="card feature">
+      <div class="icon">{{ icon("cpu") }}</div>
+      <h3>Stage 3 · Sensor Mini Brains</h3>
+      <p>Every NASA sensor has its own small <strong>neural network</strong> that learned only how that sensor
+        normally behaves. When it is surprised, AERIS listens. NASA files are recognised automatically, even if renamed.</p>
+    </div>
+  </div>
+
+  {% if metrics and metrics.expert_validation %}
+  {% set h = metrics.expert_validation %}
+  <div class="card" style="margin-top:18px">
+    <div class="card-head">
+      <h3>Tested fairly on {{ h.channels }} NASA sensors</h3>
+      <span class="pill">Trained {{ metrics.trained_at|when }}</span>
+    </div>
+    <div class="grid grid-4">
+      <div class="stat"><div class="label">Events caught</div><div class="value">{{ h.events_detected }}/{{ h.events_total }}</div><div class="hint">real anomaly events found</div></div>
+      <div class="stat"><div class="label">Precision</div><div class="value">{{ "%.2f"|format(h.precision) }}</div><div class="hint">alarms that were correct</div></div>
+      <div class="stat"><div class="label">F1 score</div><div class="value">{{ "%.2f"|format(h.f1) }}</div><div class="hint">balance of precision &amp; recall</div></div>
+      <div class="stat"><div class="label">Forecast RMSE</div><div class="value">{{ "%.3f"|format(metrics.holdout.forecast.rmse) }}</div><div class="hint">on a -1 to 1 scale</div></div>
+    </div>
+    <p class="small muted" style="margin:14px 0 0">Each sensor was judged by a version of AERIS that never saw its answers.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section" id="results" aria-labelledby="res-title">
+  <div class="grid grid-2" style="gap:40px">
+    <div>
+      <span class="eyebrow">Reading the result</span>
+      <h2 id="res-title" style="margin-top:10px">Three simple answers</h2>
+      <div class="stack" style="gap:14px; margin-top:20px">
+        <div class="row">{{ status_badge("HEALTHY") }}<span class="muted">No unusual behaviour found. All good.</span></div>
+        <div class="row">{{ status_badge("WARNING") }}<span class="muted">Something looks odd. Engineers should take a look.</span></div>
+        <div class="row">{{ status_badge("DANGER") }}<span class="muted">Strong or long-lasting problems. Act quickly.</span></div>
+      </div>
+      <p style="margin-top:20px">You also get a <strong>health score from 0 to 100</strong> for every sensor. 100 means perfectly healthy.</p>
+    </div>
+    <div class="card">
+      <h3>Words you will see</h3>
+      <dl class="glossary">
+        <dt>Anomaly</dt><dd>A reading or period that does not look like normal behaviour.</dd>
+        <dt>Precision</dt><dd>When AERIS raises an alarm, how often is it right?</dd>
+        <dt>Recall</dt><dd>Out of all real problems, how many did AERIS find?</dd>
+        <dt>F1 score</dt><dd>One number that balances precision and recall (1.0 is perfect).</dd>
+        <dt>MSE / RMSE</dt><dd>How far the forecaster's guesses were from the real readings. Smaller is better.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="data-title">
+  <div class="grid grid-3">
+    <div class="card feature">
+      <div class="icon">{{ icon("satellite") }}</div>
+      <h3 id="data-title">Real NASA data</h3>
+      <p>Trained on the public SMAP (Soil Moisture Active Passive satellite) and MSL (Curiosity rover) telemetry anomaly dataset.</p>
+    </div>
+    <div class="card feature">
+      <div class="icon">{{ icon("lock") }}</div>
+      <h3>For space organisations</h3>
+      <p>Private platform. There is no public sign-up; teams log in with accounts created by their administrator.</p>
+    </div>
+    <div class="card feature">
+      <div class="icon">{{ icon("users") }}</div>
+      <h3>Built for everyone</h3>
+      <p>Plain-language reports, a friendly assistant, bigger text, high contrast, read-aloud and full keyboard support.</p>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <h2>Ready to check on your spacecraft?</h2>
+  <p class="lead">Upload a file and let AERIS do the reading.</p>
+  <a class="btn btn-primary btn-lg" href="{{ url_for('analyze') if current_user else url_for('login') }}">
+    {{ "Start an analysis" if current_user else "Log in" }} {{ icon("arrow") }}</a>
+</section>
+{% endblock %}

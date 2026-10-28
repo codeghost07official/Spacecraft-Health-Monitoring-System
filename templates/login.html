@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="card auth-card">
+    <span class="brand-mark">{{ icon("logo") }}</span>
+    <h1 style="font-size:1.7rem">Welcome back</h1>
+    <p class="muted">Log in with the account given by your space organisation.</p>
+
+    {% if no_users %}
+    <div class="notice" role="alert">No accounts are set up yet. Add <code>ADMIN_USERNAME_1</code> and
+      <code>ADMIN_PASSWORD_1</code> to the <code>.env</code> file, then restart the app.</div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      <div class="field">
+        <label for="username">Username</label>
+        <input class="input" id="username" name="username" autocomplete="username" required autofocus
+               value="{{ request.form.username or '' }}">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+          <button class="btn btn-ghost btn-icon reveal" type="button" data-reveal="password" aria-pressed="false" title="Show password">
+            {{ icon("eye") }}<span class="sr-only">Show password</span>
+          </button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" type="submit">Log in {{ icon("arrow") }}</button>
+    </form>
+    <p class="small muted" style="margin:20px 0 0; text-align:center">New here? <a href="{{ url_for('about') }}">Learn what SHMS does</a></p>
+  </div>
+</div>
+{% endblock %}

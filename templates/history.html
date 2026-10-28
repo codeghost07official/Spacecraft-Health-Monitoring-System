@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge %}
+{% block title %}History{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <span class="eyebrow">History</span>
+    <h1 style="margin-top:10px">Your analyses</h1>
+    <p class="muted">{{ rows|length }} saved {{ "analysis" if rows|length == 1 else "analyses" }}. Open any of them or delete what you no longer need.</p>
+  </div>
+  <div class="row">
+    {% if rows %}
+    <button class="btn btn-danger" type="button" data-confirm="clear-form"
+            data-confirm-title="Delete all history?"
+            data-confirm-text="All {{ rows|length }} analyses and their reports will be deleted forever.">{{ icon("trash") }} Delete all</button>
+    <form id="clear-form" method="post" action="{{ url_for('clear_history') }}" hidden></form>
+    {% endif %}
+    <a class="btn btn-primary" href="{{ url_for('analyze') }}">{{ icon("upload") }} New analysis</a>
+  </div>
+</div>
+
+{% if rows %}
+<div class="toolbar">
+  <div class="search">
+    {{ icon("search") }}
+    <label for="history-search" class="sr-only">Search history</label>
+    <input class="input" id="history-search" type="search" placeholder="Search by file name or summary...">
+  </div>
+  <label for="history-filter" class="sr-only">Filter by status</label>
+  <select class="select" id="history-filter">
+    <option value="">All statuses</option>
+    <option value="HEALTHY">Healthy</option>
+    <option value="WARNING">Warning</option>
+    <option value="DANGER">Danger</option>
+  </select>
+</div>
+
+<div class="history-list" id="history-list">
+  {% for r in rows %}
+  <article class="h-item" data-status="{{ r.status }}" data-text="{{ (r.filename ~ ' ' ~ r.short_summary)|lower }}">
+    <div class="h-score {{ r.status }}" aria-label="Health {{ r.health_score|round|int }} out of 100">{{ r.health_score|round|int }}</div>
+    <div class="h-main">
+      <div class="title"><a href="{{ url_for('result', analysis_id=r.id) }}">{{ r.filename }}</a>{{ status_badge(r.status) }}</div>
+      <div class="meta">{{ r.created_at|when }} · {{ r.sensors }} sensor(s) · {{ "{:,}".format(r.readings) }} readings</div>
+      <p class="sum">{{ r.short_summary }}</p>
+    </div>
+    <div class="h-actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('result', analysis_id=r.id) }}">{{ icon("eye") }} Open</a>
+      <button class="btn btn-danger btn-sm" type="button" data-confirm="del-{{ r.id }}"
+              data-confirm-title="Delete this analysis?"
+              data-confirm-text="'{{ r.filename }}' and its report will be removed from your history.">{{ icon("trash") }} Delete</button>
+      <form id="del-{{ r.id }}" method="post" action="{{ url_for('delete_analysis', analysis_id=r.id) }}" hidden></form>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+<div class="card empty" id="no-match" hidden><p class="muted" style="margin:0">No analyses match your search.</p></div>
+{% else %}
+<div class="card empty">
+  <span class="dz-icon">{{ icon("history") }}</span>
+  <h2 style="font-size:1.3rem">No analyses yet</h2>
+  <p class="muted">When you analyse a telemetry file, it will be saved here.</p>
+  <a class="btn btn-primary" href="{{ url_for('analyze') }}">Start your first analysis {{ icon("arrow") }}</a>
+</div>
+{% endif %}
+
+<dialog class="modal" id="confirm-modal" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+  <div class="modal-body">
+    <span class="dz-icon">{{ icon("trash") }}</span>
+    <h2 id="confirm-title" style="font-size:1.2rem">Are you sure?</h2>
+    <p id="confirm-text" class="muted" style="margin:0"></p>
+  </div>
+  <div class="modal-actions">
+    <button class="btn btn-secondary" type="button" value="cancel" data-modal-cancel>Cancel</button>
+    <button class="btn btn-danger-solid" type="button" data-modal-ok>{{ icon("trash") }} Delete</button>
+  </div>
+</dialog>
+{% endblock %}
