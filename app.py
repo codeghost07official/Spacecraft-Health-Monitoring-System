@@ -109,6 +109,30 @@ CREATE TABLE IF NOT EXISTS analyses (
 """
 
 
+def neon_connect(url, **kwargs):
+    """Connect to Neon. If this PC's DNS cannot find the Neon host, look the
+    address up through Google's public DNS over HTTPS and connect to that address
+    (the host name is still sent for the secure connection check)."""
+    import json
+    import socket
+    import urllib.parse
+    import urllib.request
+    import psycopg2
+    host = urllib.parse.urlparse(url).hostname
+    try:
+        socket.getaddrinfo(host, 5432)
+    except socket.gaierror:
+        try:
+            with urllib.request.urlopen(f"https://dns.google/resolve?name={host}&type=A", timeout=10) as r:
+                answers = json.load(r).get("Answer", [])
+            ips = [a["data"] for a in answers if a.get("type") == 1]
+            if ips:
+                kwargs["hostaddr"] = ips[0]
+        except Exception:
+            pass  # fall through: the normal connection error is reported below
+    return psycopg2.connect(url, connect_timeout=15, **kwargs)
+
+
 class Database:
     def __init__(self, url):
         self.url = url
@@ -116,8 +140,6 @@ class Database:
         self.error = None
         if url:
             try:
-                import psycopg2
-                self._pg = psycopg2
                 self.kind = "neon"
                 self.run(SCHEMA)
                 return
@@ -136,7 +158,7 @@ class Database:
     def run(self, sql, params=(), fetch=None):
         if self.kind == "neon":
             sql = sql.replace("?", "%s")
-            conn = self._pg.connect(self.url, connect_timeout=15)
+            conn = neon_connect(self.url)
             try:
                 with conn, conn.cursor() as cur:
                     cur.execute(sql, params)
